@@ -1,3 +1,4 @@
+import copy
 class GameState():
     def __init__(self):
         self.board = [
@@ -263,36 +264,39 @@ class GameState():
         #print(movesDict.get((row, col), None))
 
 
-    def getValidMoves(self):
+    def getValidMoves(self, shuffled=False):
         # get all possible moves
         allPossibleMoves = self.getAllPossibleMoves()
         realIsWhiteTurn = self.whiteTurn
 
         for k, moves in allPossibleMoves.items():
-            for i in range(len(moves)-1, -1, -1):
-                self.makeMove(moves[i])
+            mmm = copy.deepcopy(moves)
+            for i in range(0, len(mmm)):
+                self.makeMove(mmm[i])
                 opponentMoves = self.getAllPossibleMoves()
                 for m, opponentMovesList in opponentMoves.items():
                     for j in range(0, len(opponentMovesList)):
                         if realIsWhiteTurn:
                             if opponentMovesList[j].toCoordinate[0] ==  self.whiteKingLocation[0] and opponentMovesList[j].toCoordinate[1] == self.whiteKingLocation[1]:
-                                moves.pop(i)
+                                try:
+                                    moves.remove(mmm[i])
+                                except:
+                                    pass
+                                    #print(mmm[i])
+                                #moves.pop(i)
                         else:
                             if opponentMovesList[j].toCoordinate[0] ==  self.blackKingLocation[0] and opponentMovesList[j].toCoordinate[1] == self.blackKingLocation[1]:
-                                moves.pop(i)
+                                #moves.remove(moves[i])
+                                try:
+                                    #moves.pop(i)
+                                    moves.remove(mmm[i])
+                                except:
+                                    pass
+                                    #print(mmm[i])
+
                 self.undoMove()
-
-
-
-                '''
-                self.whiteTurn = not self.whiteTurn
-                if self.isInCheck():
-                    #moves.remove(moves[i])
-                    moves.pop(i)
-                self.whiteTurn = not self.whiteTurn
-                self.undoMove()
-                '''
-
+        if shuffled == True:
+            return {x for v in allPossibleMoves.values() for x in v}
         return allPossibleMoves
 
     def isInCheck(self):
@@ -331,6 +335,8 @@ class Move():
         if (self.pieceToMove == "wP" and self.toCoordinate[0] == 0) or (self.pieceToMove == "bP" and self.toCoordinate[0] == 7):
             self.isPawnPromotion = True
 
+        self.moveHash = self.fromCoordinate[0] * 1000 + self.fromCoordinate[1] * 100 + self.toCoordinate[0] * 10 + self.toCoordinate[1]
+
     def __str__(self):
         output = ""
         for name, var in vars(self).items():
@@ -338,10 +344,13 @@ class Move():
             output += str(name) + " : " + str(var) + "; "
         return output
 
+    def __hash__(self):
+        return self.moveHash
+
     __repr__ = __str__
 
     def __eq__(self, other):
-        if self.fromCoordinate == other.fromCoordinate and self.toCoordinate == other.toCoordinate and self.pieceToMove == other.pieceToMove and self.pieceCaptured == other.pieceCaptured:
+        if self.fromCoordinate == other.fromCoordinate and self.toCoordinate == other.toCoordinate and self.pieceToMove == other.pieceToMove and self.pieceCaptured == other.pieceCaptured and self.isPawnPromotion == other.isPawnPromotion:
             return True
         else:
             return False

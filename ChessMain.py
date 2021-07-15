@@ -1,7 +1,8 @@
 import pygame as p
 from Chess import ChessEngine
-
-
+from Chess import AI
+from multiprocessing import Process
+from multiprocessing import Queue
 WIDTH = 512
 HEIGHT = 512
 
@@ -35,48 +36,87 @@ def main():
 
     validMoves = gameState.getValidMoves()
     previousSelection = None
+
+    whiteIsAI = False
+    blackIsAI = True
+
+    AIThinking = False
+    process = None
+    undo = False
     while running:
         for e in p.event.get():
             if e.type == p.QUIT:
                 running = not running
             elif e.type == p.MOUSEBUTTONDOWN:
-                positionClicked = p.mouse.get_pos()
-                #row, column
-                coordinateClicked = (positionClicked[1]//(HEIGHT//8),positionClicked[0]//(HEIGHT//8))
-                if previousSelection != None:
-                    if previousSelection == coordinateClicked:
-                        previousSelection = None
-                    else:
-                        move = ChessEngine.Move(previousSelection, coordinateClicked, gameState.board)
-                        if validMoves.get(previousSelection, None) != None:
-                            for i in range(0, len(validMoves[previousSelection])):
-                                if move == validMoves[previousSelection][i]:
-                                    gameState.makeMove(validMoves[previousSelection][i])
+                if isHumanTurn(whiteIsAI, blackIsAI, gameState) == True:
+                    positionClicked = p.mouse.get_pos()
+                    #row, column
+                    coordinateClicked = (positionClicked[1]//(HEIGHT//8),positionClicked[0]//(HEIGHT//8))
+                    if previousSelection != None:
+                        if previousSelection == coordinateClicked:
+                            previousSelection = None
+                        else:
+                            move = ChessEngine.Move(previousSelection, coordinateClicked, gameState.board)
+                            if validMoves.get(previousSelection, None) != None:
+                                for i in range(0, len(validMoves[previousSelection])):
+                                    if move == validMoves[previousSelection][i]:
+                                        gameState.makeMove(validMoves[previousSelection][i])
+                                        validMoves = gameState.getValidMoves()
+                                        undo = False
+                                        break
+                                '''
+                                if move in validMoves[previousSelection]:
+                                    gameState.makeMove(move)
                                     validMoves = gameState.getValidMoves()
-                                    break
-                            '''
-                            if move in validMoves[previousSelection]:
-                                gameState.makeMove(move)
-                                validMoves = gameState.getValidMoves()
-                            '''
-                        previousSelection = None
-
-                        #print(validMoves)
-
-                else:
-                    if gameState.board[coordinateClicked[0]][coordinateClicked[1]] != "__":
-                        previousSelection = coordinateClicked
+                                '''
+                            previousSelection = None
+                            #drawBoard(screen, gameState, previousSelection, validMoves)
+                            #clock.tick(MAX_FPS)
+                            #p.display.flip()
+                    else:
+                        if gameState.board[coordinateClicked[0]][coordinateClicked[1]] != "__":
+                            previousSelection = coordinateClicked
             # Undo
             elif e.type == p.KEYDOWN:
                 if e.key == p.K_z:
                     gameState.undoMove()
                     validMoves = gameState.getValidMoves()
+                    if AIThinking:
+                        process.terminate()
+                        AIThinking = False
+                    undo = True
                 if e.key == p.K_r:
                     gameState = ChessEngine.GameState()
                     validMoves = gameState.getValidMoves()
                     previousSelection = None
+                    if AIThinking:
+                        process.terminate()
+                        AIThinking = False
+                    process = None
+                    undo = False
 
 
+
+        if isGameOver(validMoves) == False and isHumanTurn(whiteIsAI, blackIsAI, gameState) == False and undo == False:
+            if AIThinking == False:
+                AIThinking = True
+                print("Thinking")
+                q = Queue()
+                process = Process(target=AI.findBestMiniMaxMove, args=(validMoves, gameState, q))
+                process.start()
+            if process.is_alive() == False:
+                print("done")
+                #minimaxMove = AI.findBestMiniMaxMove(validMoves, gameState)
+                minimaxMove = q.get()
+                if minimaxMove is None:
+                    print("picking random move")
+                    randomMove = AI.findRandomMove(validMoves, gameState)
+                    gameState.makeMove(randomMove)
+                else:
+                    gameState.makeMove(minimaxMove)
+                validMoves = gameState.getValidMoves()
+                previousSelection = None
+                AIThinking = False
 
 
         drawBoard(screen, gameState, previousSelection, validMoves)
@@ -87,6 +127,13 @@ def main():
                 showWinningText("White Wins! Press R to reset the game", screen)
         clock.tick(MAX_FPS)
         p.display.flip()
+
+def isHumanTurn(whiteIsAI, blackIsAI, gameState):
+    if (whiteIsAI == False and gameState.whiteTurn == True) or (blackIsAI == False and gameState.whiteTurn == False):
+        return True
+    else:
+        return False
+
 
 def isGameOver(validMoves):
     for k, v in validMoves.items():
