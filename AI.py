@@ -32,7 +32,7 @@ bishopPositionRewards = [
             [3, 4, 3, 2, 2, 3, 4,3],
             [4, 3, 2, 1, 1, 2, 3,4],
         ]
-# 5,1 is 4 because its a god position to infiltrate and capture rook on the other sie
+# 5,1 is 4 because its a good position to infiltrate and capture rook on the other sie
 # will try to centralize the queen
 queenPositionRewards = [
             [1, 1, 1, 3, 1, 1, 1,1],
@@ -77,6 +77,7 @@ blackPawnRewards = list(reversed(whitePawnRewards))
 checkmateScore = 1000
 max_depth = 2
 
+# function for finding random moves in case the algorithm is unable to find the best move
 def findRandomMove(validMoves, gameState):
     m = []
     for k, v in validMoves.items():
@@ -85,104 +86,146 @@ def findRandomMove(validMoves, gameState):
     #print(m)
     return m[random.randint(0, len(m) - 1)]
 
+# This function calls the concrete algorithm function to get the best move.
 def findBestMiniMaxMove(validMoves, gameState, q):
     global nxtMove
     global count
     count = 0
     nxtMove = None
     v = {x for v in validMoves.values() for x in v}
+    #v = [x for v in validMoves.values() for x in v]
     #print(v)
-    #findMiniMaxMove(validMoves, gameState, max_depth, gameState.whiteTurn)
-    findNegaMaxMove(v, gameState, max_depth, 1 if gameState.whiteTurn else -1)
+    findOptmizedNegaMaxMove(v, gameState, max_depth, 1 if gameState.whiteTurn else -1)
+    # print number of states explored
+    print("count")
     print(count)
-    q.put(nxtMove)
+    q.put((nxtMove, count))
     #return nxtMove
 
+# heuristic function for sorting moves prior to alpha beta pruning
+def func(move, gameState):
+    heuristic = 0
+    row = move.toCoordinate[0]
+    col = move.toCoordinate[1]
 
-def findMiniMaxMove(validMoves, gameState, depth, whiteTurn):
-    global nxtMove
-    if depth == 0:
-        return calculateBoardScore(gameState, validMoves)
-    # to maximize
-    if whiteTurn:
-        maxSoFar = float('-inf')
-        for k, v in validMoves.items():
-            for move in v:
-                gameState.makeMove(move)
-                nextMoves = gameState.getValidMoves()
-                s = findMiniMaxMove(nextMoves, gameState, depth-1, not whiteTurn)
+    if gameState.board[row][col] != "__":
+        heuristic -= scoreDict[gameState.board[row][col][1]]
 
-                if s > maxSoFar:
-                    maxSoFar = max(maxSoFar, s)
-                    if depth == max_depth:
-                        nxtMove = move
+    return heuristic
 
-                gameState.undoMove()
-        return maxSoFar
 
-    else: # to minimize
-        minSoFar = float('inf')
-        for k, v in validMoves.items():
-            for move in v:
-                gameState.makeMove(move)
-                nextMoves = gameState.getValidMoves()
-                s = findMiniMaxMove(nextMoves, gameState, depth - 1, not whiteTurn)
-                if s < minSoFar:
-                    minSoFar = min(s, minSoFar)
-                    if depth == max_depth:
-                        nxtMove = move
-                gameState.undoMove()
-        return minSoFar
-'''
-# 1 if whites turn, -1 if black
-def findNegaMaxMove(validMoves, gameState, depth, turn, alpha=False, beta=False):
-    global nxtMove
-    if depth == 0:
-        return turn * calculateBoardScore(gameState, validMoves)
 
-    #maxScore = -checkmateScore
-    maxScore = float('-inf')
-    #for k, v in validMoves.items():
-    for move in validMoves:
-        gameState.makeMove(move)
-        nextMoves = gameState.getValidMoves(shuffled=True)
-        s = -findNegaMaxMove(nextMoves, gameState, depth - 1, -turn)
-        if s > maxScore:
-            maxScore = s
-            if max_depth == depth:
-                nxtMove = move
-        gameState.undoMove()
-    return maxScore
-'''
 # 1 if whites turn, -1 if black
 # alpha = current max, beta = min...in recursive call, alpha becomes opponents new min -> hence the -alpha. Beta becomes opponents max
-def findNegaMaxMove(validMoves, gameState, depth, turn, alpha=float("-inf"), beta=float("inf")):
+# alpha and beta initialized as -inf and inf respectively
+def findOptmizedNegaMaxMove(validMoves, gameState, depth, turn, alpha=float("-inf"), beta=float("inf")):
     global nxtMove
     global count
     count = count + 1
+    # end depth is reached
     if depth == 0:
         return turn * calculateBoardScore(gameState, validMoves)
 
-    #move ordering
+    #move ordering prior to branch exploration to optimize
+    validMoves = list(validMoves)
+    validMoves.sort(key=lambda x: func(x, gameState))
+
     maxScore = float('-inf')
     for move in validMoves:
         gameState.makeMove(move)
         nextMoves = gameState.getValidMoves(shuffled=True)
-        s = -findNegaMaxMove(nextMoves, gameState, depth - 1, -turn, -beta, -alpha)
+        # recursively call negamax but with turn inverted
+        s = -findOptmizedNegaMaxMove(nextMoves, gameState, depth - 1, -turn, -beta, -alpha)
         if s > maxScore:
             maxScore = s
             if max_depth == depth:
                 nxtMove = move
                 debug = ""
-                debug += str(move.toCoordinate) + " " + move.pieceToMove
+                debug += str(move.toCoordinate) + " " + move.pieceToMove + " " + str(maxScore)
                 print(debug)
         gameState.undoMove()
+        # the alpha beta pruning part
         if maxScore > alpha:
             alpha = maxScore
         if alpha >= beta:
             break
+
     return maxScore
 
+
+def findNegaMaxMoveWithoutAlphaBeta(validMoves, gameState, depth, turn, alpha=float("-inf"), beta=float("inf")):
+    global nxtMove
+    global count
+    count = count + 1
+    # end depth is reached
+    if depth == 0:
+        return turn * calculateBoardScore(gameState, validMoves)
+    '''
+    # move ordering prior to branch exploration to optimize
+    validMoves = list(validMoves)
+    validMoves.sort(key=lambda x: func(x, gameState))
+    '''
+    maxScore = float('-inf')
+    for move in validMoves:
+        gameState.makeMove(move)
+        nextMoves = gameState.getValidMoves(shuffled=True)
+        # recursively call negamax but with turn inverted
+        s = -findNegaMaxMoveWithoutAlphaBeta(nextMoves, gameState, depth - 1, -turn, -beta, -alpha)
+        if s > maxScore:
+            maxScore = s
+            if max_depth == depth:
+                nxtMove = move
+                debug = ""
+                debug += str(move.toCoordinate) + " " + move.pieceToMove + " " + str(maxScore)
+                print(debug)
+        gameState.undoMove()
+        '''
+        # the alpha beta pruning part
+        if maxScore > alpha:
+            alpha = maxScore
+        if alpha >= beta:
+            break
+        '''
+
+    return maxScore
+
+def findNegaMaxMoveWithAlphaBeta(validMoves, gameState, depth, turn, alpha=float("-inf"), beta=float("inf")):
+    global nxtMove
+    global count
+    count = count + 1
+    # end depth is reached
+    if depth == 0:
+        return turn * calculateBoardScore(gameState, validMoves)
+    '''
+    # move ordering prior to branch exploration to optimize
+    validMoves = list(validMoves)
+    validMoves.sort(key=lambda x: func(x, gameState))
+    '''
+    maxScore = float('-inf')
+    for move in validMoves:
+        gameState.makeMove(move)
+        nextMoves = gameState.getValidMoves(shuffled=True)
+        # recursively call negamax but with turn inverted
+        s = -findNegaMaxMoveWithAlphaBeta(nextMoves, gameState, depth - 1, -turn, -beta, -alpha)
+        if s > maxScore:
+            maxScore = s
+            if max_depth == depth:
+                nxtMove = move
+                debug = ""
+                debug += str(move.toCoordinate) + " " + move.pieceToMove + " " + str(maxScore)
+                print(debug)
+        gameState.undoMove()
+
+        # the alpha beta pruning part
+        if maxScore > alpha:
+            alpha = maxScore
+        if alpha >= beta:
+            break
+
+
+    return maxScore
+
+# scoring function for negamax algorithm facilitating alpha beta pruning
 def calculateBoardScore(gameState, validMoves):
     if len(validMoves) == 0:
         if gameState.whiteTurn == True:
@@ -209,20 +252,10 @@ def calculateBoardScore(gameState, validMoves):
                         positionScore = knightPositionRewards[row][col]
                     else:
                         positionScore = 0
+                # score represents the degree of favorability of a current board state for a given player
+                # it is cumulative score of pieces summed with heuristic score multipled by a factor of 0.01
                 if gameState.board[row][col][0] == "w":
                     score = score + (scoreDict[gameState.board[row][col][1]] + (positionScore * 0.01))
                 elif gameState.board[row][col][0] == "b":
                     score = score - (scoreDict[gameState.board[row][col][1]] + (positionScore * 0.01))
     return score
-
-'''
-def calculateBoardScore(gameState):
-    score = 0
-    for row in range(0, len(gameState.board)):
-        for col in range(0, len(gameState.board)):
-            if gameState.board[row][col][0] == "w":
-                score = score + scoreDict[gameState.board[row][col][1]]
-            elif gameState.board[row][col][0] == "b":
-                score = score - scoreDict[gameState.board[row][col][1]]
-    return score
-'''
