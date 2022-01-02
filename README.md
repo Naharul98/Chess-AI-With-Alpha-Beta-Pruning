@@ -1,4 +1,4 @@
-# Chess AI based on Minimax with Alpha-beta pruning optimization
+# Chess Game + AI
 
 ![ScreenShot](https://github.com/Naharul98/Chess-AI-With-Alpha-Beta-Pruning/blob/main/screenshot.jpg?raw=true)
 
