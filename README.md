@@ -1,6 +1,6 @@
 # Chess
 
-Chess AI built on Minimax algorithm and optimized using alpha beta pruning.
+#### Chess AI built on Minimax algorithm and optimized using alpha beta pruning.
 
 ![ScreenShot](https://github.com/Naharul98/Chess-AI-With-Alpha-Beta-Pruning/blob/main/screenshot.jpg?raw=true)
 
